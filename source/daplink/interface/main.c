@@ -31,7 +31,7 @@
 #include "uart.h"
 #include "tasks.h"
 #include "target_reset.h"
-#include "swd_host.h"
+#include "dap_host.h"
 #include "info.h"
 #include "settings.h"
 #include "daplink.h"
@@ -225,7 +225,7 @@ void main_task(void * arg)
     
     //setup some flags
     if (g_board_info.flags & kEnableUnderResetConnect) {
-        swd_set_reset_connect(CONNECT_UNDER_RESET);
+        dap_set_reset_connect(CONNECT_UNDER_RESET);
     }
     if (g_board_info.flags & kEnablePageErase) {
 #ifdef DRAG_N_DROP_SUPPORT        
