@@ -27,7 +27,7 @@
 #include "validation.h"
 #include "target_config.h"
 #include "intelhex.h"
-#include "swd_host.h"
+#include "dap_host.h"
 #include "flash_intf.h"
 #include "util.h"
 #include "settings.h"
@@ -71,11 +71,11 @@ static error_t target_flash_init()
     }
 
     // Download flash programming algorithm to target and initialise.
-    if (0 == swd_write_memory(flash->algo_start, (uint8_t *)flash->algo_blob, flash->algo_size)) {
+    if (0 == dap_write_memory(flash->algo_start, (uint8_t *)flash->algo_blob, flash->algo_size)) {
         return ERROR_ALGO_DL;
     }
 
-    if (0 == swd_flash_syscall_exec(&flash->sys_call_s, flash->init, target_device.flash_start, 0, 0, 0)) {
+    if (0 == dap_flash_syscall_exec(&flash->sys_call_s, flash->init, target_device.flash_start, 0, 0, 0)) {
         return ERROR_INIT;
     }
     state = STATE_OPEN;
@@ -95,7 +95,7 @@ static error_t target_flash_uninit(void)
     // This is usually a no-op for most targets.
     target_set_state(POST_FLASH_RESET);
     state = STATE_CLOSED;
-    swd_off();
+    dap_off();
     return ERROR_SUCCESS;
 }
 
@@ -112,12 +112,12 @@ static error_t target_flash_program_page(uint32_t addr, const uint8_t *buf, uint
         uint32_t write_size = MIN(size, flash->program_buffer_size);
 
         // Write page to buffer
-        if (!swd_write_memory(flash->program_buffer, (uint8_t *)buf, write_size)) {
+        if (!dap_write_memory(flash->program_buffer, (uint8_t *)buf, write_size)) {
             return ERROR_ALGO_DATA_SEQ;
         }
 
         // Run flash programming
-        if (!swd_flash_syscall_exec(&flash->sys_call_s,
+        if (!dap_flash_syscall_exec(&flash->sys_call_s,
                                     flash->program_page,
                                     addr,
                                     write_size,
@@ -129,7 +129,7 @@ static error_t target_flash_program_page(uint32_t addr, const uint8_t *buf, uint
         if (config_get_automation_allowed()) {
             // Verify data flashed if in automation mode
             if (flash->verify != 0) {
-                if (!swd_flash_syscall_exec(&flash->sys_call_s,
+                if (!dap_flash_syscall_exec(&flash->sys_call_s,
                                     flash->verify,
                                     addr,
                                     write_size,
@@ -141,7 +141,7 @@ static error_t target_flash_program_page(uint32_t addr, const uint8_t *buf, uint
                 while (write_size > 0) {
                     uint8_t rb_buf[16];
                     uint32_t verify_size = MIN(write_size, sizeof(rb_buf));
-                    if (!swd_read_memory(addr, rb_buf, verify_size)) {
+                    if (!dap_read_memory(addr, rb_buf, verify_size)) {
                         return ERROR_ALGO_DATA_SEQ;
                     }
                     if (memcmp(buf, rb_buf, verify_size) != 0) {
@@ -173,7 +173,7 @@ static error_t target_flash_erase_sector(uint32_t addr)
         return ERROR_ERASE_SECTOR;
     }
 
-    if (0 == swd_flash_syscall_exec(&flash->sys_call_s, flash->erase_sector, addr, 0, 0, 0)) {
+    if (0 == dap_flash_syscall_exec(&flash->sys_call_s, flash->erase_sector, addr, 0, 0, 0)) {
         return ERROR_ERASE_SECTOR;
     }
 
@@ -185,7 +185,7 @@ static error_t target_flash_erase_chip(void)
     error_t status = ERROR_SUCCESS;
     const program_target_t *const flash = target_device.flash_algo;
 
-    if (0 == swd_flash_syscall_exec(&flash->sys_call_s, flash->erase_chip, 0, 0, 0, 0)) {
+    if (0 == dap_flash_syscall_exec(&flash->sys_call_s, flash->erase_chip, 0, 0, 0, 0)) {
         return ERROR_ERASE_ALL;
     }
 

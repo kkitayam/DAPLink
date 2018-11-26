@@ -19,7 +19,8 @@
  * limitations under the License.
  */
 
-#ifndef TARGET_MCU_CORTEX_A
+#if !defined(TARGET_MCU_CORTEX_A)
+
 #include "RTL.h"
 #include "target_reset.h"
 #include "target_config.h"
@@ -27,6 +28,8 @@
 #include "debug_cm.h"
 #include "DAP_config.h"
 #include "DAP.h"
+
+#if (DAP_SWD==1)
 
 // Default NVIC and Core debug base addresses
 // TODO: Read these addresses from ROM.
@@ -1139,4 +1142,5 @@ uint8_t swd_set_target_state_sw(TARGET_RESET_STATE state)
 
     return 1;
 }
+#endif /* (DAP_SWD==1) */
 #endif
