@@ -30,6 +30,8 @@
 #include "target_family.h"
 #include "device.h"
 
+#if (DAP_SWD==1)
+
 // Default NVIC and Core debug base addresses
 // TODO: Read these addresses from ROM.
 #define NVIC_Addr    (0xe000e000)
@@ -1166,4 +1168,5 @@ uint8_t swd_set_target_state_sw(TARGET_RESET_STATE state)
 
     return 1;
 }
+#endif /* (DAP_SWD==1) */
 #endif

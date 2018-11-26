@@ -86,7 +86,10 @@ extern "C" {
 void init_family(void);
 uint8_t target_family_valid(void);
 uint8_t target_set_state(TARGET_RESET_STATE state);
+void dap_set_target_reset(uint8_t asserted);
+#if (DAP_JTAG==0)
 void swd_set_target_reset(uint8_t asserted);
+#endif
 uint32_t target_get_apsel(void);
 
 #ifdef __cplusplus

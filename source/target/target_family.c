@@ -21,7 +21,7 @@
 
 #include "daplink.h"
 #include "DAP_config.h"
-#include "swd_host.h"
+#include "dap_host.h"
 #include "target_family.h"
 #include "target_board.h"
 
@@ -130,14 +130,14 @@ uint8_t target_set_state(TARGET_RESET_STATE state)
             return g_target_family->target_set_state(state);
         } else {
             if (g_target_family->default_reset_type == kHardwareReset) {
-                return swd_set_target_state_hw(state);
+                return dap_set_target_state_hw(state);
             } else if (g_target_family->default_reset_type == kSoftwareReset) {
                 if (g_board_info.soft_reset_type) { //board has precedence
-                    swd_set_soft_reset(g_board_info.soft_reset_type);
+                    dap_set_soft_reset(g_board_info.soft_reset_type);
                 } else if (g_target_family->soft_reset_type) {
-                    swd_set_soft_reset(g_target_family->soft_reset_type);
+                    dap_set_soft_reset(g_target_family->soft_reset_type);
                 }
-                return swd_set_target_state_sw(state);
+                return dap_set_target_state_sw(state);
             }else {
                 return 1;
             } 
@@ -147,6 +147,23 @@ uint8_t target_set_state(TARGET_RESET_STATE state)
     }
 }
 
+#if (DAP_JTAG==1)
+void jtag_set_target_reset(uint8_t asserted)
+{
+    (asserted) ? PIN_nRESET_OUT(0) : PIN_nRESET_OUT(1);
+}
+#endif
+
+void dap_set_target_reset(uint8_t asserted)
+{
+#if (DAP_SWD==1)
+    swd_set_target_reset(asserted);
+#else
+    jtag_set_target_reset(asserted);
+#endif
+}
+
+#if (DAP_SWD==1)
 void swd_set_target_reset(uint8_t asserted)
 {
     if (g_target_family && g_target_family->swd_set_target_reset) {
@@ -155,6 +172,7 @@ void swd_set_target_reset(uint8_t asserted)
         (asserted) ? PIN_nRESET_OUT(0) : PIN_nRESET_OUT(1);
     }
 }
+#endif
 
 uint32_t target_get_apsel()
 {
