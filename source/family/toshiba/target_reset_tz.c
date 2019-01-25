@@ -21,13 +21,13 @@
 
 #include "cmsis_os2.h"
 #include "target_reset.h"
-#include "swd_host.h"
+#include "dap_host.h"
 #include "target_family.h"
 
 static void target_before_init_debug_tz(void) {
-    swd_set_target_reset(1);
+    dap_set_target_reset(1);
     osDelay(2);
-    swd_set_target_reset(0);
+    dap_set_target_reset(0);
     osDelay(2);
     return;
 }

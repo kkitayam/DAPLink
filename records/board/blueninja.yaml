@@ -1,6 +1,8 @@
 common:
     macros:
         - IO_CONFIG_OVERRIDE
+        - SOFT_RESET=VECTRESET
+        - CONF_JTAG
     includes:
         - source/board/override_blueninja
     sources:
