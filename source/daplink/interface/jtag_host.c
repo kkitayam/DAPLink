@@ -102,12 +102,8 @@ static uint32_t current_ap = AHB_AP;
 #define SCB_AIRCR_PRIGROUP_Pos              8                                             /*!< SCB AIRCR: PRIGROUP Position */
 #define SCB_AIRCR_PRIGROUP_Msk             (7UL << SCB_AIRCR_PRIGROUP_Pos)                /*!< SCB AIRCR: PRIGROUP Mask */
 
-#if !defined(SOFT_RESET)
-#define SOFT_RESET  SYSRESETREQ
-#endif
-
 static DAP_CONNECT_TYPE reset_connect = CONNECT_NORMAL;
-static uint32_t soft_reset = SOFT_RESET;
+static uint32_t soft_reset = SYSRESETREQ;
 
 #endif
 
@@ -115,6 +111,12 @@ typedef struct {
     uint32_t r[16];
     uint32_t xpsr;
 } DEBUG_STATE;
+
+static union {
+    uint8_t  b[8];
+    uint32_t w[2];
+} req_xfer = {ID_DAP_Transfer, 0, 1, };
+static uint8_t resp[8];
 
 // Write 32-bit word aligned values to target memory using address auto-increment.
 // size is in bytes.
@@ -591,13 +593,12 @@ static uint8_t jtag_write_debug_state(DEBUG_STATE *state)
 static int jtag_debug_port_setup(void)
 {
     int type;
-    uint8_t response[4];
 
     /* request DAP_Connect() */
-    DAP_ProcessCommand("\x02\x00", response);
-    type = response[1];
+    DAP_ProcessCommand("\x02\x00", resp);
+    type = resp[1];
     /* request DAP_JTAG_Configure() to setup IR Length */
-    DAP_ProcessCommand("\x15\x01\x04", response);
+    DAP_ProcessCommand("\x15\x01\x04", resp);
 
     if (type == 2) { /* JTAG */
 #if (DAP_SWJ != 0)
@@ -605,8 +606,8 @@ static int jtag_debug_port_setup(void)
         SWJ_Sequence(16, REV_STR(E7,3C));
         SWJ_Sequence(6, REV_STR(3F));
 #endif
-        JTAG_Sequence(6 | JTAG_SEQUENCE_TMS, REV_STR(3F), &response[0]);
-        JTAG_Sequence(1, REV_STR(01), &response[1]);
+        JTAG_Sequence(6 | JTAG_SEQUENCE_TMS, REV_STR(3F), &resp[0]);
+        JTAG_Sequence(1, REV_STR(01), &resp[1]);
         return 1;
     }
     return 0;
@@ -725,31 +726,21 @@ uint8_t jtag_init_debug(void)
 uint8_t jtag_read_dp(uint8_t adr, uint32_t *val)
 {
     uint32_t num;
-    union {
-        uint8_t  b[8];
-        uint32_t w[2];
-    } req = {ID_DAP_Transfer, 0, 1,};
-    uint8_t res[7];
 
-    req.b[3] = (adr & (DAP_TRANSFER_A2|DAP_TRANSFER_A3)) | DAP_TRANSFER_RnW;
-    num = DAP_ProcessCommand(req.b, res);
-    if (((num & 0xFFFF) != sizeof(res)) ||
-            (res[0] != ID_DAP_Transfer) || (res[1] != 1) || (res[2] != 1)) {
+    req_xfer.b[3] = (adr & (DAP_TRANSFER_A2|DAP_TRANSFER_A3)) | DAP_TRANSFER_RnW;
+    num = DAP_ProcessCommand(req_xfer.b, resp);
+    if (((num & 0xFFFF) != 7) ||
+            (resp[0] != ID_DAP_Transfer) || (resp[1] != 1) || (resp[2] != 1)) {
         jtag_host_printf("E %d\n", __LINE__);
         return 0;
     }
-    *val = (res[6]<<24) | (res[5]<<16) | (res[4]<<8) | res[3];
+    *val = (resp[6]<<24) | (resp[5]<<16) | (resp[4]<<8) | resp[3];
     return 1;
 }
 
 uint8_t jtag_write_dp(uint8_t adr, uint32_t val)
 {
     uint32_t num;
-    union {
-        uint8_t  b[8];
-        uint32_t w[2];
-    } req = {ID_DAP_Transfer, 0, 1};
-    uint8_t res[3];
 
 #ifdef TARGET_MCU_CORTEX_A
     if (DP_SELECT == adr) {
@@ -757,11 +748,11 @@ uint8_t jtag_write_dp(uint8_t adr, uint32_t val)
     }
 #endif
 
-    req.b[3] = adr & (DAP_TRANSFER_A2|DAP_TRANSFER_A3);
-    req.w[1] = val;
-    num = DAP_ProcessCommand(req.b, res);
-    if (((num & 0xFFFF) != sizeof(res)) ||
-            (res[0] != ID_DAP_Transfer) || (res[1] != 1) || (res[2] != 1)) {
+    req_xfer.b[3] = adr & (DAP_TRANSFER_A2|DAP_TRANSFER_A3);
+    req_xfer.w[1] = val;
+    num = DAP_ProcessCommand(req_xfer.b, resp);
+    if (((num & 0xFFFF) != 3) ||
+            (resp[0] != ID_DAP_Transfer) || (resp[1] != 1) || (resp[2] != 1)) {
         jtag_host_printf("E %d\n", __LINE__);
         return 0;
     }
@@ -772,38 +763,28 @@ uint8_t jtag_write_dp(uint8_t adr, uint32_t val)
 uint8_t jtag_read_ap(uint32_t adr, uint32_t *val)
 {
     uint32_t num;
-    union {
-        uint8_t  b[8];
-        uint32_t w[2];
-    } req = {ID_DAP_Transfer, 0, 1,};
-    uint8_t res[7];
 
-    req.b[3] = (adr & (DAP_TRANSFER_A2|DAP_TRANSFER_A3)) | DAP_TRANSFER_RnW | DAP_TRANSFER_APnDP;
-    num = DAP_ProcessCommand(req.b, res);
-    if (((num & 0xFFFF) != sizeof(res)) ||
-            (res[0] != ID_DAP_Transfer) || (res[1] != 1) || (res[2] != 1)) {
-        jtag_host_printf("E %d %x %x %x %x\n", __LINE__, num, res[0], res[1], res[2]);
+    req_xfer.b[3] = (adr & (DAP_TRANSFER_A2|DAP_TRANSFER_A3)) | DAP_TRANSFER_RnW | DAP_TRANSFER_APnDP;
+    num = DAP_ProcessCommand(req_xfer.b, resp);
+    if (((num & 0xFFFF) != 7) ||
+            (resp[0] != ID_DAP_Transfer) || (resp[1] != 1) || (resp[2] != 1)) {
+        jtag_host_printf("E %d %x %x %x %x\n", __LINE__, num, resp[0], resp[1], resp[2]);
         return 0;
     }
-    *val = (res[6]<<24) | (res[5]<<16) | (res[4]<<8) | res[3];
+    *val = (resp[6]<<24) | (resp[5]<<16) | (resp[4]<<8) | resp[3];
     return 1;
 }
 
 uint8_t jtag_write_ap(uint32_t adr, uint32_t val)
 {
     uint32_t num;
-    union {
-        uint8_t  b[8];
-        uint32_t w[2];
-    } req = {ID_DAP_Transfer, 0, 1};
-    uint8_t res[3];
 
-    req.b[3] = adr & (DAP_TRANSFER_A2|DAP_TRANSFER_A3) | DAP_TRANSFER_APnDP;
-    req.w[1] = val;
-    num = DAP_ProcessCommand(req.b, res);
-    if (((num & 0xFFFF) != sizeof(res)) ||
-            (res[0] != ID_DAP_Transfer) || (res[1] != 1) || (res[2] != 1)) {
-        jtag_host_printf("E %d %x %x %x %x\n", __LINE__, num, res[0], res[1], res[2]);
+    req_xfer.b[3] = adr & (DAP_TRANSFER_A2|DAP_TRANSFER_A3) | DAP_TRANSFER_APnDP;
+    req_xfer.w[1] = val;
+    num = DAP_ProcessCommand(req_xfer.b, resp);
+    if (((num & 0xFFFF) != 3) ||
+            (resp[0] != ID_DAP_Transfer) || (resp[1] != 1) || (resp[2] != 1)) {
+        jtag_host_printf("E %d %x %x %x %x\n", __LINE__, num, resp[0], resp[1], resp[2]);
         return 0;
     }
     return 1;
