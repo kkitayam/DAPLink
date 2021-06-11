@@ -136,7 +136,7 @@ uint8_t dap_set_target_state_sw(TARGET_RESET_STATE state)
 void dap_set_reset_connect(DAP_CONNECT_TYPE type)
 {
 #if (DAP_SWD == 1)
-    return dap_set_reset_connect(type);
+    return swd_set_reset_connect(type);
 #endif
 }
 
